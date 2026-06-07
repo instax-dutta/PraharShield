@@ -35,14 +35,14 @@ jobs:
         run: |
           VERSION=$(./gradlew -q properties | grep "^version:" | awk '{print $2}')
           JAR=$(find build/libs -name "*.jar" ! -name "*-javadoc*" ! -name "*-sources*" | head -n 1)
-          mv "$JAR" "build/libs/v${VERSION}.jar"
-          echo "JAR_NAME=v${VERSION}.jar" >> $GITHUB_ENV
+          mv "$JAR" "build/libs/praharshield-${VERSION}.jar"
+          echo "JAR_NAME=praharshield-${VERSION}.jar" >> $GITHUB_ENV
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: praharshield
-          path: build/libs/v*.jar
+          path: build/libs/praharshield-*.jar
           retention-days: 14
 
       - name: Create Release
