@@ -29,13 +29,19 @@ import net.elytrium.limboapi.api.event.LoginLimboRegisterEvent;
 import com.praharshield.filter.PraharFilter;
 import com.praharshield.filter.Settings;
 import com.praharshield.filter.stats.Statistics;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class FilterListener {
 
-  private final PraharFilter plugin;
+  private static final Logger LOGGER = LoggerFactory.getLogger(FilterListener.class);
 
-  public FilterListener(PraharFilter plugin) {
+  private final PraharFilter plugin;
+  private final boolean limboAuthPresent;
+
+  public FilterListener(PraharFilter plugin, boolean limboAuthPresent) {
     this.plugin = plugin;
+    this.limboAuthPresent = limboAuthPresent;
   }
 
   @Subscribe(order = PostOrder.FIRST)
