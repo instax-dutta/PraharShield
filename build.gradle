@@ -9,7 +9,7 @@ plugins {
 }
 
 setGroup("com.praharshield")
-setVersion("1.1.22-PRAHAR")
+setVersion("1.1.23-PRAHAR")
 
 compileJava {
     getOptions().setEncoding("UTF-8")

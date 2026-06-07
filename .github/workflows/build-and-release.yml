@@ -35,7 +35,10 @@ jobs:
         run: |
           VERSION=$(./gradlew -q properties | grep "^version:" | awk '{print $2}')
           JAR=$(find build/libs -name "*.jar" ! -name "*-javadoc*" ! -name "*-sources*" | head -n 1)
-          mv "$JAR" "build/libs/praharshield-${VERSION}.jar"
+          TARGET="build/libs/praharshield-${VERSION}.jar"
+          if [ "$JAR" != "$TARGET" ]; then
+            mv "$JAR" "$TARGET"
+          fi
           echo "JAR_NAME=praharshield-${VERSION}.jar" >> $GITHUB_ENV
 
       - name: Upload build artifact
@@ -49,7 +52,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/v*.jar
+          files: build/libs/praharshield-*.jar
           draft: false
           prerelease: false
         env:
