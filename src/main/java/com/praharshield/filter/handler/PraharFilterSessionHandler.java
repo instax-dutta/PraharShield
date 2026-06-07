@@ -409,6 +409,14 @@ public class PraharFilterSessionHandler implements LimboSessionHandler {
     this.player.closeWith(reason);
     if (blocked) {
       this.statistics.addBlockedConnection();
+      com.praharshield.filter.webhook.WebhookBatcher batcher = this.plugin.getWebhookBatcher();
+      if (batcher != null) {
+        batcher.enqueue(
+            this.proxyPlayer.getRemoteAddress().getAddress().getHostAddress(),
+            this.proxyPlayer.getUsername(),
+            "bot-filter-block"
+        );
+      }
     }
   }
 

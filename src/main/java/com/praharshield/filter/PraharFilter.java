@@ -34,7 +34,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOError;
 import java.io.IOException;
+import com.praharshield.filter.ratelimit.IPRateLimiter;
+import com.praharshield.filter.webhook.WebhookBatcher;
 import java.net.InetAddress;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.net.UnknownHostException;
 import java.nio.file.Path;
 import java.util.Map;
@@ -85,7 +89,8 @@ import org.slf4j.Logger;
         "PraharShield",
     },
     dependencies = {
-        @Dependency(id = "limboapi")
+        @Dependency(id = "limboapi"),
+        @Dependency(id = "limboauth", optional = true)
     }
 )
 public class PraharFilter {
@@ -114,7 +119,10 @@ public class PraharFilter {
   private CaptchaGenerator generator;
   private CachedPackets packets;
   private boolean logsDisabled;
+  private boolean limboAuthPresent;
   private TcpListener tcpListener;
+  private ScheduledExecutorService webhookExecutor;
+  private WebhookBatcher webhookBatcher;
 
   private static PraharFilter INSTANCE;
 
@@ -170,6 +178,30 @@ public class PraharFilter {
 
   public void reload() {
     Settings.IMP.reload(this.configFile, Settings.IMP.PREFIX);
+
+    this.limboAuthPresent = this.server.getPluginManager().getPlugin("limboauth").isPresent();
+    if (this.limboAuthPresent) {
+      LOGGER.info("LimboAuth detected — deferring online-mode verification.");
+    }
+
+    IPRateLimiter.reloadTrustedSubnets(Settings.IMP.MAIN.TRUSTED_SUBNETS);
+
+    if (this.webhookExecutor != null) {
+      this.webhookExecutor.shutdown();
+      this.webhookExecutor = null;
+      this.webhookBatcher = null;
+    }
+    if (Settings.IMP.MAIN.WEBHOOK_ENABLED) {
+      this.webhookExecutor = Executors.newSingleThreadScheduledExecutor(
+          r -> new Thread(r, "praharshield-webhook"));
+      this.webhookBatcher = new WebhookBatcher(
+          Settings.IMP.MAIN.WEBHOOK_URL,
+          Settings.IMP.MAIN.WEBHOOK_BATCH_SIZE,
+          Settings.IMP.MAIN.WEBHOOK_QUEUE_CAP,
+          this.webhookExecutor,
+          Settings.IMP.MAIN.WEBHOOK_FLUSH_INTERVAL_SECONDS
+      );
+    }
 
     ComponentSerializer<Component, Component, String> serializer = Settings.IMP.SERIALIZER.getSerializer();
     if (serializer == null) {
@@ -347,7 +379,7 @@ public class PraharFilter {
     manager.register("sendfilter", new SendFilterCommand(this));
 
     this.server.getEventManager().unregisterListeners(this);
-    this.server.getEventManager().register(this, new FilterListener(this));
+    this.server.getEventManager().register(this, new FilterListener(this, this.limboAuthPresent));
 
     if (this.tcpListener != null) {
       this.tcpListener.stop();
@@ -519,6 +551,14 @@ public class PraharFilter {
 
   public TcpListener getTcpListener() {
     return this.tcpListener;
+  }
+
+  public WebhookBatcher getWebhookBatcher() {
+    return this.webhookBatcher;
+  }
+
+  public boolean isLimboAuthPresent() {
+    return this.limboAuthPresent;
   }
 
   public CaptchaHolder getNextCaptcha() {

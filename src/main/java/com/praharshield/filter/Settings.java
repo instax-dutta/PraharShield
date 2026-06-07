@@ -57,13 +57,15 @@ public class Settings extends YamlConfig {
     @Comment("Check if player's Minecraft client has a brand.")
     public boolean CHECK_CLIENT_BRAND = true;
     @Comment("If a player's Minecraft client brand (e.g., fabric or forge) is set here, then that player will be kicked.")
-    public List<String> BLOCKED_CLIENT_BRANDS = List.of("brand1", "brand2");
+    public List<String> BLOCKED_CLIENT_BRANDS = List.of("null", "");
+    @Comment("Trusted IP subnets (CIDR) that bypass rate limiting — use for Tailscale/relay addresses.")
+    public List<String> TRUSTED_SUBNETS = List.of("100.64.0.0/10");
     @Comment("Time in milliseconds, how frequently will the cache list with verified players be reset. Before that time, verified players can join the server without passing antibot checks.")
     public long PURGE_CACHE_MILLIS = 3600000;
     @Comment("Max attempts, which a player has to solve the captcha.")
-    public int CAPTCHA_ATTEMPTS = 2;
+    public int CAPTCHA_ATTEMPTS = 3;
     @Comment("Duration of Falling Check in Minecraft ticks (1 tick = 0.05 second, 20 ticks = 1 second).")
-    public int FALLING_CHECK_TICKS = 128;
+    public int FALLING_CHECK_TICKS = 60;
     @Comment("Maximum time to check the player in milliseconds. If the player stays on the filter limbo for longer than this time, then the check will fail.")
     public int TIME_OUT = 15000;
     @Comment("Same, but for Geyser users.")
@@ -87,7 +89,7 @@ public class Settings extends YamlConfig {
         "CAPTCHA_POSITION -> Falling and Captcha checking concurrently (Player will be kicked, if he fails either falling check or captcha checking).",
         "CAPTCHA_ON_POSITION_FAILED -> Initially, the falling check will be started, but if the player fails that check, the captcha checking will be started."
     })
-    public PraharFilterSessionHandler.CheckState CHECK_STATE = PraharFilterSessionHandler.CheckState.CAPTCHA_POSITION;
+    public PraharFilterSessionHandler.CheckState CHECK_STATE = PraharFilterSessionHandler.CheckState.ONLY_CAPTCHA;
     @Comment("See \"filter-auto-toggle.check-state-toggle\".")
     public PraharFilterSessionHandler.CheckState CHECK_STATE_NON_TOGGLED = PraharFilterSessionHandler.CheckState.CAPTCHA_ON_POSITION_FAILED;
 
@@ -195,7 +197,7 @@ public class Settings extends YamlConfig {
       public int CHECK_STATE_TOGGLE = 0;
 
       @Comment("The player will need to reconnect after passing the AntiBot check.")
-      public int NEED_TO_RECONNECT = 129;
+      public int NEED_TO_RECONNECT = 200;
 
       @Comment("Picture in the MOTD Server Ping packet will be disabled.")
       public int DISABLE_MOTD_PICTURE = 25;
@@ -414,6 +416,13 @@ public class Settings extends YamlConfig {
       @Comment("Permission: praharshield.admin.help")
       public CommandPermissionState HELP = CommandPermissionState.TRUE;
     }
+
+    @Comment("Webhook settings for bot-block notifications.")
+    public boolean WEBHOOK_ENABLED = false;
+    public String WEBHOOK_URL = "";
+    public int WEBHOOK_BATCH_SIZE = 100;
+    public int WEBHOOK_FLUSH_INTERVAL_SECONDS = 5;
+    public int WEBHOOK_QUEUE_CAP = 10000;
 
     @Create
     public MAIN.STRINGS STRINGS;

@@ -55,10 +55,10 @@ dependencies {
 shadowJar {
     getArchiveClassifier().set("")
 
-    relocate("org.bstats", "net.elytrium.limboapi.thirdparty.org.bstats")
-    relocate("net.elytrium.commons.velocity", "net.elytrium.limboapi.thirdparty.commons.velocity")
-    relocate("net.elytrium.commons.kyori", "net.elytrium.limboapi.thirdparty.commons.kyori")
-    relocate("net.elytrium.commons.config", "net.elytrium.limboapi.thirdparty.commons.config")
+    relocate("org.bstats", "com.praharshield.thirdparty.org.bstats")
+    relocate("net.elytrium.commons.velocity", "com.praharshield.thirdparty.commons.velocity")
+    relocate("net.elytrium.commons.kyori", "com.praharshield.thirdparty.commons.kyori")
+    relocate("net.elytrium.commons.config", "com.praharshield.thirdparty.commons.config")
 }
 
 license {

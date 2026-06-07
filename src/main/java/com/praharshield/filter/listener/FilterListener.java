@@ -42,6 +42,16 @@ public class FilterListener {
   public void onProxyConnect(PreLoginEvent event) {
     this.plugin.getStatistics().addConnection();
 
+    java.net.InetAddress resolved = event.getConnection().getRemoteAddress().getAddress();
+    if (resolved.getHostAddress().startsWith("100.")) {
+      LOGGER.warn("PraharShield: PROXY protocol may not be configured correctly. "
+          + "Source IP {} is a Tailscale address. Check Velocity proxy-protocol setting.", resolved);
+    }
+
+    if (this.limboAuthPresent && Settings.IMP.MAIN.FILTER_AUTO_TOGGLE.ONLINE_MODE_VERIFY != -1) {
+      return;
+    }
+
     if (this.plugin.checkCpsLimit(Settings.IMP.MAIN.FILTER_AUTO_TOGGLE.ONLINE_MODE_VERIFY)
         && this.plugin.shouldCheck(event.getUsername(), event.getConnection().getRemoteAddress().getAddress())) {
       event.setResult(PreLoginEvent.PreLoginComponentResult.forceOfflineMode());
@@ -61,6 +71,9 @@ public class FilterListener {
 
   @Subscribe(order = PostOrder.FIRST)
   public void onLogin(LoginLimboRegisterEvent event) {
+    if (this.limboAuthPresent && Settings.IMP.MAIN.FILTER_AUTO_TOGGLE.ONLINE_MODE_VERIFY != -1) {
+      return;
+    }
     Player player = event.getPlayer();
     if (this.plugin.shouldCheck(player)) {
       event.addOnJoinCallback(() -> this.plugin.sendToFilterServer(player));
