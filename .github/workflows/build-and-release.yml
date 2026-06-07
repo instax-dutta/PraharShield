@@ -28,31 +28,73 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
+      - name: Resolve version
+        id: ver
+        run: |
+          VERSION=$(./gradlew -q properties | grep "^version:" | awk '{print $2}')
+          if [ -z "$VERSION" ]; then
+            echo "::error::Could not resolve project version from gradle"
+            exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "jar_path=build/libs/praharshield-${VERSION}.jar" >> "$GITHUB_OUTPUT"
+          echo "jar_name=praharshield-${VERSION}.jar" >> "$GITHUB_OUTPUT"
+
       - name: Build with Gradle
         run: ./gradlew shadowJar --no-daemon
 
-      - name: Rename built JAR
+      - name: Normalize JAR name
+        env:
+          TARGET: ${{ steps.ver.outputs.jar_path }}
         run: |
-          VERSION=$(./gradlew -q properties | grep "^version:" | awk '{print $2}')
           JAR=$(find build/libs -name "*.jar" ! -name "*-javadoc*" ! -name "*-sources*" | head -n 1)
-          TARGET="build/libs/praharshield-${VERSION}.jar"
+          if [ -z "$JAR" ]; then
+            echo "::error::No JAR produced by shadowJar"
+            exit 1
+          fi
           if [ "$JAR" != "$TARGET" ]; then
             mv "$JAR" "$TARGET"
           fi
-          echo "JAR_NAME=praharshield-${VERSION}.jar" >> $GITHUB_ENV
+
+      - name: Verify shadowJar relocations
+        env:
+          JAR: ${{ steps.ver.outputs.jar_path }}
+        run: |
+          # commons.* libraries are provided by LimboAPI at runtime under
+          # net.elytrium.limboapi.thirdparty.*. If our bytecode references
+          # com/praharshield/thirdparty/commons/* it means we wrongly relocated
+          # them and the plugin will throw NoClassDefFoundError at load time.
+          if grep -qa 'com/praharshield/thirdparty/commons' "$JAR"; then
+            echo "::error::commons.* relocated under com.praharshield namespace. LimboAPI provides these at runtime under net.elytrium.limboapi.thirdparty.* — fix build.gradle relocations."
+            grep -ao 'com/praharshield/thirdparty/commons[a-zA-Z0-9/_$]*' "$JAR" | sort -u | head -20
+            exit 1
+          fi
+          # bstats IS bundled and SHOULD be relocated into our namespace.
+          if ! grep -qa 'com/praharshield/thirdparty/org/bstats' "$JAR"; then
+            echo "::error::org.bstats was not relocated under com.praharshield namespace. Check shadowJar relocate rules."
+            exit 1
+          fi
+          # No raw net.elytrium.commons.* references should leak through.
+          if grep -qa 'net/elytrium/commons/' "$JAR"; then
+            echo "::error::Unrelocated net.elytrium.commons.* references found. shadowJar relocate rules missing or incorrect."
+            grep -ao 'net/elytrium/commons/[a-zA-Z0-9/_$]*' "$JAR" | sort -u | head -20
+            exit 1
+          fi
+          echo "Relocation verification passed."
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: praharshield
-          path: build/libs/praharshield-*.jar
+          path: ${{ steps.ver.outputs.jar_path }}
           retention-days: 14
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/praharshield-*.jar
+          files: ${{ steps.ver.outputs.jar_path }}
+          fail_on_unmatched_files: true
           draft: false
           prerelease: false
         env:
