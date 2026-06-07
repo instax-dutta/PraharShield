@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up JDK 21
         uses: actions/setup-java@v4
@@ -89,11 +91,144 @@ jobs:
           path: ${{ steps.ver.outputs.jar_path }}
           retention-days: 14
 
+      - name: Compute JAR checksum
+        if: startsWith(github.ref, 'refs/tags/')
+        id: sha
+        env:
+          JAR: ${{ steps.ver.outputs.jar_path }}
+        run: |
+          SHA=$(sha256sum "$JAR" | awk '{print $1}')
+          SIZE=$(wc -c < "$JAR" | awk '{ printf "%.2f KB", $1/1024 }')
+          echo "sha256=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "size=${SIZE}" >> "$GITHUB_OUTPUT"
+
+      - name: Build categorized changelog
+        if: startsWith(github.ref, 'refs/tags/')
+        id: changelog
+        run: |
+          git fetch --tags --force
+          PREV_TAG=$(git tag --sort=-creatordate | grep -v "^${GITHUB_REF_NAME}$" | head -n 1 || true)
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+            COMPARE_URL="https://github.com/${GITHUB_REPOSITORY}/compare/${PREV_TAG}...${GITHUB_REF_NAME}"
+          else
+            RANGE="HEAD"
+            COMPARE_URL=""
+          fi
+
+          out=/tmp/changelog.md
+          : > "$out"
+
+          append_section() {
+            local prefix="$1" title="$2"
+            local entries
+            entries=$(git log "$RANGE" --no-merges --pretty="* %s (%h)" \
+              | grep -E "^\* ${prefix}(\([^)]+\))?!?: " \
+              | sed -E "s/^\* ${prefix}(\([^)]+\))?!?: */* /")
+            if [ -n "$entries" ]; then
+              {
+                echo "### ${title}"
+                echo ""
+                echo "$entries"
+                echo ""
+              } >> "$out"
+            fi
+          }
+
+          append_section feat     "Features"
+          append_section fix      "Bug Fixes"
+          append_section perf     "Performance"
+          append_section refactor "Refactoring"
+          append_section docs     "Documentation"
+          append_section ci       "CI / Build"
+          append_section build    "Build System"
+          append_section chore    "Chores"
+          append_section test     "Tests"
+
+          # Catch-all for commits that don't follow Conventional Commits.
+          other=$(git log "$RANGE" --no-merges --pretty="* %s (%h)" \
+            | grep -Ev "^\* (feat|fix|perf|refactor|docs|ci|build|chore|test)(\([^)]+\))?!?: " || true)
+          if [ -n "$other" ]; then
+            {
+              echo "### Other Changes"
+              echo ""
+              echo "$other"
+              echo ""
+            } >> "$out"
+          fi
+
+          if [ ! -s "$out" ]; then
+            echo "_No commit log changes since the previous tag._" > "$out"
+          fi
+
+          {
+            echo "compare_url=${COMPARE_URL}"
+            echo "prev_tag=${PREV_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Assemble release body
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          VERSION:     ${{ steps.ver.outputs.version }}
+          JAR_NAME:    ${{ steps.ver.outputs.jar_name }}
+          SHA256:      ${{ steps.sha.outputs.sha256 }}
+          SIZE:        ${{ steps.sha.outputs.size }}
+          PREV_TAG:    ${{ steps.changelog.outputs.prev_tag }}
+          COMPARE_URL: ${{ steps.changelog.outputs.compare_url }}
+        run: |
+          body=/tmp/release-body.md
+          {
+            echo "# PraharShield ${VERSION}"
+            echo ""
+            echo "Production-grade bot filter for Velocity proxies, forked from LimboFilter with Tailscale/PROXY-protocol awareness, LimboAuth interop, and batched webhook notifications."
+            echo ""
+            echo "## Install"
+            echo ""
+            echo "Drop \`${JAR_NAME}\` into your Velocity \`plugins/\` directory and restart the proxy."
+            echo ""
+            echo "\`\`\`bash"
+            echo "wget -O plugins/${JAR_NAME} \\"
+            echo "  https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${JAR_NAME}"
+            echo "\`\`\`"
+            echo ""
+            echo "## Requirements"
+            echo ""
+            echo "| Component | Version |"
+            echo "|-----------|---------|"
+            echo "| Velocity  | 3.5.0+  |"
+            echo "| Java      | 21+     |"
+            echo "| LimboAPI  | 1.1.27+ |"
+            echo "| LimboAuth | optional |"
+            echo ""
+            echo "## Artifact"
+            echo ""
+            echo "| Field  | Value |"
+            echo "|--------|-------|"
+            echo "| File   | \`${JAR_NAME}\` |"
+            echo "| Size   | ${SIZE} |"
+            echo "| SHA-256 | \`${SHA256}\` |"
+            echo ""
+            echo "## Changelog"
+            echo ""
+            cat /tmp/changelog.md
+            if [ -n "$COMPARE_URL" ]; then
+              echo ""
+              echo "**Full diff:** [\`${PREV_TAG}...${GITHUB_REF_NAME}\`](${COMPARE_URL})"
+            fi
+            echo ""
+            echo "---"
+            echo ""
+            echo "Issues & support: https://github.com/${GITHUB_REPOSITORY}/issues"
+          } > "$body"
+          echo "BODY_PATH=${body}" >> "$GITHUB_ENV"
+
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.ver.outputs.jar_path }}
+          name: PraharShield ${{ steps.ver.outputs.version }}
+          body_path: ${{ env.BODY_PATH }}
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
