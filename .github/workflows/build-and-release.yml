@@ -33,21 +33,23 @@ jobs:
 
       - name: Rename built JAR
         run: |
+          VERSION=$(./gradlew -q properties | grep "^version:" | awk '{print $2}')
           JAR=$(find build/libs -name "*.jar" ! -name "*-javadoc*" ! -name "*-sources*" | head -n 1)
-          mv "$JAR" "build/libs/praharshield.jar"
+          mv "$JAR" "build/libs/v${VERSION}.jar"
+          echo "JAR_NAME=v${VERSION}.jar" >> $GITHUB_ENV
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: praharshield
-          path: build/libs/praharshield.jar
+          path: build/libs/v*.jar
           retention-days: 14
 
       - name: Create Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: build/libs/praharshield.jar
+          files: build/libs/v*.jar
           draft: false
           prerelease: false
         env:
