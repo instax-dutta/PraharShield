@@ -9,7 +9,7 @@ plugins {
 }
 
 setGroup("com.praharshield")
-setVersion("1.1.20-PRAHAR")
+setVersion("1.1.21-PRAHAR")
 
 compileJava {
     getOptions().setEncoding("UTF-8")
@@ -56,9 +56,9 @@ shadowJar {
     getArchiveClassifier().set("")
 
     relocate("org.bstats", "com.praharshield.thirdparty.org.bstats")
-    relocate("net.elytrium.commons.velocity", "com.praharshield.thirdparty.commons.velocity")
-    relocate("net.elytrium.commons.kyori", "com.praharshield.thirdparty.commons.kyori")
-    relocate("net.elytrium.commons.config", "com.praharshield.thirdparty.commons.config")
+    relocate("net.elytrium.commons.velocity", "net.elytrium.limboapi.thirdparty.commons.velocity")
+    relocate("net.elytrium.commons.kyori", "net.elytrium.limboapi.thirdparty.commons.kyori")
+    relocate("net.elytrium.commons.config", "net.elytrium.limboapi.thirdparty.commons.config")
 }
 
 license {
